@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { loadProjects, saveProjects } from './storage'
 import { githubClientConfigured, startDeviceFlow, pollDeviceToken, getUser, getRepos, findConfigGist, saveGist, readRepoPlan, getLatestCommit, type GitHubRepo, type GitHubUser, type DeviceCode } from './github'
-import { Activity, ArrowUpRight, BookOpen, Check, ChevronDown, Circle, Clock3, Github, LayoutDashboard, ListChecks, Plus, Search, Settings2, Sparkles, Target, X } from 'lucide-react'
+import { Activity, ArrowUpRight, BookOpen, Check, ChevronDown, Circle, Clock3, Github, LayoutDashboard, ListChecks, Plus, Search, Settings2, Sparkles, Target, X, RefreshCw } from 'lucide-react'
 import { parseMarkdownPlan, progressFromPhases, parseLogbook } from './progress'
 
 type Project = {
@@ -147,7 +147,7 @@ function App() {
     <main className="main-content">
       <header className="topbar">
         <div className="breadcrumb"><span>Workspace</span><span className="crumb-sep">/</span><strong>{selected ? selected.name : view==='overview'?'Overview':view==='repos'?'Repositories':'Activity'}</strong></div>
-        <div className="top-actions"><button className="github-connect-btn" onClick={()=>githubToken?disconnectGitHub():setConnectOpen(true)}>{githubToken?<><Github size={15}/> {githubUser?.login||'GitHub'} · Disconnect</>:<><Github size={15}/> Connect GitHub</>}</button><div className="search-box"><Search size={16}/><input placeholder="Search projects..." value={query} onChange={e=>setQuery(e.target.value)}/><kbd>⌘ K</kbd></div><button className="avatar">RP</button></div>
+        <div className="top-actions">{githubToken&&<button className="github-connect-btn" onClick={()=>void refreshLiveProjects(githubToken,githubRepos,projects)} title="Refresh selected repositories"><RefreshCw size={15}/> Sync</button>}<button className="github-connect-btn" onClick={()=>githubToken?disconnectGitHub():setConnectOpen(true)}>{githubToken?<><Github size={15}/> {githubUser?.login||'GitHub'} · Disconnect</>:<><Github size={15}/> Connect GitHub</>}</button><div className="search-box"><Search size={16}/><input placeholder="Search projects..." value={query} onChange={e=>setQuery(e.target.value)}/><kbd>⌘ K</kbd></div><button className="avatar">RP</button></div>
       </header>
       {selected ? <ProjectDetail project={selected} onClose={()=>setSelected(null)} onTask={setTask}/> : view==='overview' ? <Overview projects={visible} stats={stats} onOpen={openProject} onAdd={()=>setShowPicker(true)} query={query}/> : view==='repos' ? <RepoView projects={projects} onToggle={toggleTrack} onOpen={openProject} query={query}/> : <ActivityView projects={projects.filter(p=>p.tracked)}/>}
       <div className="notice"><Sparkles size={14}/>{syncing?'Syncing selected repositories…':notice}</div>
