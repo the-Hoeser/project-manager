@@ -17,11 +17,16 @@ This repository currently contains the **front-end prototype** with local sample
 - Responsive layouts and reduced-motion support
 
 ### Not connected yet
-- GitHub OAuth / GitHub App authorization
-- Fetch real repository list and file contents
-- Persist selection and task state
-- Sync schedule / refresh
+- GitHub authorization and repository discovery
+- Fetch real repository Markdown and commit activity
+- GitHub-backed cross-device configuration persistence
+- Automatic refresh and cache invalidation
 - Test suite and deployment
+
+### Persistence milestone
+- Project tracking selection and current checklist state now restore from browser `localStorage` after reload/revisit on the same browser/device.
+- This is a local persistence step only; it is not yet GitHub-backed and does not yet synchronize across devices.
+- Planned persistent cloud configuration: a small private GitHub-hosted JSON data file (or private Gist), with the user's GitHub account as the storage provider. No RepoPulse-owned database or file storage.
 
 ## Run locally
 
