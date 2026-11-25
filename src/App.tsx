@@ -1,4 +1,5 @@
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { loadProjects, saveProjects } from './storage'
 import { Activity, ArrowUpRight, BookOpen, Check, ChevronDown, Circle, Clock3, Github, LayoutDashboard, ListChecks, Plus, Search, Settings2, Sparkles, Target, X } from 'lucide-react'
 import { parseMarkdownPlan, progressFromPhases, parseLogbook } from './progress'
 
@@ -31,13 +32,14 @@ const totalStats = (projects: Project[]) => {
   return { active: tracked.length, done, total, average: total ? Math.round(done / total * 100) : 0 }
 }
 function App() {
-  const [projects, setProjects] = useState(initialProjects)
+  const [projects, setProjects] = useState(() => loadProjects(initialProjects))
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'overview'|'repos'|'activity'>('overview')
   const [selected, setSelected] = useState<Project | null>(null)
   const [showPicker, setShowPicker] = useState(false)
   const [notice, setNotice] = useState('Demo data · Connect GitHub to replace these sample repositories')
   const stats = useMemo(() => totalStats(projects), [projects])
+  useEffect(() => { saveProjects(projects) }, [projects])
   const visible = projects.filter(p => p.tracked && (p.name.toLowerCase().includes(query.toLowerCase()) || p.description.toLowerCase().includes(query.toLowerCase())))
   const toggleTrack = (id: string) => setProjects(prev => prev.map(p => p.id === id ? { ...p, tracked: !p.tracked } : p))
   const setTask = (projectId: string, phaseIndex: number, taskIndex: number, checked: boolean) => {
