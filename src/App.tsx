@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { loadProjects, saveProjects } from './storage'
 import { githubClientConfigured, startDeviceFlow, pollDeviceToken, getUser, getRepos, findConfigGist, saveGist, readRepoPlan, getLatestCommit, type GitHubRepo, type GitHubUser, type DeviceCode } from './github'
 import { Activity, ArrowUpRight, BookOpen, Check, ChevronDown, Circle, Clock3, Github, LayoutDashboard, ListChecks, Plus, Search, Settings2, Sparkles, Target, X, RefreshCw } from 'lucide-react'
@@ -40,6 +40,7 @@ function App() {
   const [gistId, setGistId] = useState<string|null>(localStorage.getItem('repopulse.config.gist'))
   const [connectOpen, setConnectOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const cloudSaveTimer = useRef<number|null>(null)
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'overview'|'repos'|'activity'>('overview')
   const [selected, setSelected] = useState<Project | null>(null)
@@ -51,7 +52,10 @@ function App() {
   const toggleTrack = (id: string) => {
     const updated = projects.map(p => p.id === id ? { ...p, tracked: !p.tracked } : p)
     setProjects(updated)
-    if (githubToken) void persistCloudConfig(githubToken, gistId, updated, setGistId)
+    if (githubToken) {
+      if (cloudSaveTimer.current) window.clearTimeout(cloudSaveTimer.current)
+      cloudSaveTimer.current = window.setTimeout(() => void persistCloudConfig(githubToken, gistId, updated, setGistId), 650)
+    }
   }
   const refreshLiveProjects = async (token: string, repoList: GitHubRepo[], current: Project[]) => {
     const tracked = current.filter(p => p.tracked && p.live)
