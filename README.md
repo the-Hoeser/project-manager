@@ -50,6 +50,10 @@ This first implementation requests `read:user` and `gist` scopes. It can list an
 
 The OAuth Client ID is public and configured as a frontend value. Never add a client secret to frontend code.
 
+## Deploy to Netlify
+
+This repository is ready for Netlify continuous deployment. One-click setup: [Deploy to Netlify](https://app.netlify.com/start/deploy?repository=https://github.com/the-Hoeser/project-manager). Connect your GitHub account, choose the repository, and Netlify will use `netlify.toml` to build and publish `dist`. Future pushes to `main` will trigger production deploys.
+
 ## Run locally
 
 ```bash
