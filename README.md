@@ -16,17 +16,39 @@ This repository currently contains the **front-end prototype** with local sample
 - Markdown checklist parser and percentage calculator
 - Responsive layouts and reduced-motion support
 
-### Not connected yet
-- GitHub authorization and repository discovery
-- Fetch real repository Markdown and commit activity
-- GitHub-backed cross-device configuration persistence
-- Automatic refresh and cache invalidation
-- Test suite and deployment
+### Live GitHub integration milestone
+- GitHub OAuth Device Flow sign-in (no backend)
+- Fetches public repositories for the connected account
+- Track/untrack repositories from the real GitHub repo list
+- Reads Markdown plan/checklist and logbook files from selected repos
+- Recalculates progress locally from repository Markdown
+- Private Gist configuration stores selected repository IDs
+- Local cache restores instantly; sync runs on return, tab visibility, and every 30 minutes while open
+- Live project checklist is read-only: RepoPulse never writes tasks back into project repositories
 
-### Persistence milestone
-- Project tracking selection and current checklist state now restore from browser `localStorage` after reload/revisit on the same browser/device.
-- This is a local persistence step only; it is not yet GitHub-backed and does not yet synchronize across devices.
-- Planned persistent cloud configuration: a small private GitHub-hosted JSON data file (or private Gist), with the user's GitHub account as the storage provider. No RepoPulse-owned database or file storage.
+### Remaining
+- Configure OAuth client ID and test actual sign-in in browser
+- Add support for private repositories through an explicit permission decision
+- Add tests and deploy
+
+### Persistence model
+- Browser `localStorage` caches dashboard state for fast reopening.
+- A private GitHub Gist named `repopulse-config.json` persists tracked repository IDs across devices.
+- Repository plan/logbook files stay in the original GitHub repositories; RepoPulse does not store project copies on a server.
+- Sync is browser-side and recalculates progress deterministically.
+
+## GitHub OAuth setup (backend-free)
+
+1. Create a GitHub OAuth App in GitHub Settings → Developer settings → OAuth Apps.
+2. Enable **Device Flow** for the OAuth App.
+3. Copy its Client ID.
+4. Create a local `.env` file from `.env.example` and set `VITE_GITHUB_CLIENT_ID`.
+5. Run `npm install` and `npm run dev`.
+6. In RepoPulse, click **Connect GitHub** and complete the code-based authorization.
+
+This first implementation requests `read:user` and `gist` scopes. It can list and read public repositories and create/update a private Gist for configuration. It deliberately does **not** request the broad `repo` scope, so private repositories are not yet supported. OAuth access tokens are stored in browser local storage for return-session continuity; this is a backend-free trade-off, and users can disconnect to clear the saved token.
+
+Create a production OAuth App with Device Flow enabled and configure its Client ID in the static hosting provider's build environment. Never add a client secret to frontend code.
 
 ## Run locally
 
