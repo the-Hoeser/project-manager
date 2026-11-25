@@ -43,7 +43,7 @@ export async function saveGist(token:string, gistId:string|null, content:string)
 export async function findConfigGist(token:string):Promise<Gist|null>{ const gists=await listGists(token); const match=gists.find(g=>Object.keys(g.files||{}).includes('repopulse-config.json') && !g.public); if(!match)return null; return request<Gist>(API+'/gists/'+match.id,token) }
 export async function readTextFile(token:string, repo:GitHubRepo, path:string):Promise<string|null>{
  const url=API+'/repos/'+repo.owner.login+'/'+repo.name+'/contents/'+path.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(repo.default_branch)
- try{ const item=await request<{type:string;content?:string;encoding?:string}>(url,token); if(item.type!=='file'||!item.content)return null; return decodeURIComponent(escape(atob(item.content.replace(/\n/g,'')))) }catch{return null}
+ try{ const item=await request<{type:string;content?:string;encoding?:string}>(url,token); if(item.type!=='file'||!item.content)return null; return new TextDecoder().decode(Uint8Array.from(atob(item.content.replace(/\n/g,'')),c=>c.charCodeAt(0))) }catch{return null}
 }
 export async function readRepoPlan(token:string,repo:GitHubRepo):Promise<{plan:string;log:string;planPath:string;logPath:string|null}>{
  const tree=await request<{tree:{path:string;type:string}[]}>(API+'/repos/'+repo.owner.login+'/'+repo.name+'/git/trees/'+encodeURIComponent(repo.default_branch)+'?recursive=1',token)
