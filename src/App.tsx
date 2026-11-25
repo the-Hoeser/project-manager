@@ -156,7 +156,20 @@ function App() {
       {selected ? <ProjectDetail project={selected} onClose={()=>setSelected(null)} onTask={setTask}/> : view==='overview' ? <Overview projects={visible} stats={stats} onOpen={openProject} onAdd={()=>setShowPicker(true)} query={query}/> : view==='repos' ? <RepoView projects={projects} onToggle={toggleTrack} onOpen={openProject} query={query}/> : <ActivityView projects={projects.filter(p=>p.tracked)}/>}
       <div className="notice"><Sparkles size={14}/>{syncing?'Syncing selected repositories…':notice}</div>
     </main>
-    {showPicker && <RepoPicker projects={projects} onToggle={toggleTrack} onClose={()=>setShowPicker(false)}/>}{connectOpen && <ConnectGitHub onClose={()=>setConnectOpen(false)} onConnected={async token=>{setConnectOpen(false);try{await connectGitHub(token)}catch(e){setNotice(e instanceof Error?e.message:'GitHub connection failed')}}}/}
+    {showPicker && <RepoPicker projects={projects} onToggle={toggleTrack} onClose={()=>setShowPicker(false)} />}
+    {connectOpen && (
+      <ConnectGitHub
+        onClose={() => setConnectOpen(false)}
+        onConnected={async (token) => {
+          setConnectOpen(false)
+          try {
+            await connectGitHub(token)
+          } catch (e) {
+            setNotice(e instanceof Error ? e.message : 'GitHub connection failed')
+          }
+        }}
+      />
+    )}
   </div>
 }
 
