@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+
+# Netlify local state
+.netlify/
+
+# Editor / OS files
+.DS_Store
+.vscode/
+.idea/
