@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Activity, ArrowUpRight, BookOpen, Check, ChevronDown, Circle, Clock3, Github, LayoutDashboard, ListChecks, Plus, Search, Settings2, Sparkles, Target, X } from 'lucide-react'
 import { parseMarkdownPlan, progressFromPhases, parseLogbook } from './progress'
 
@@ -45,7 +45,7 @@ function App() {
       const phases = parseMarkdownPlan(plan)
       if (!phases[phaseIndex]?.tasks[taskIndex]) return plan
       phases[phaseIndex].tasks[taskIndex].done = checked
-      return phases.map(ph => '# ' + ph.title + '\\n' + ph.tasks.map(t => '- [' + (t.done ? 'x' : ' ') + '] ' + t.title).join('\\n')).join('\\n')
+      return phases.map(ph => '# ' + ph.title + '\n' + ph.tasks.map(t => '- [' + (t.done ? 'x' : ' ') + '] ' + t.title).join('\n')).join('\n')
     }
     setProjects(prev => prev.map(p => p.id === projectId ? { ...p, plan: rebuildPlan(p.plan) } : p))
     setSelected(prev => prev?.id === projectId ? { ...prev, plan: rebuildPlan(prev.plan) } : prev)
@@ -95,7 +95,7 @@ function Overview({projects,stats,onOpen,onAdd,query}:{projects:Project[];stats:
     <div className="bottom-note"><span className="sparkle">✦</span><span>Progress is pulled from your plan, not guessed.</span></div>
   </div>
 }
-function Stat({label,value,icon,tint}:{label:string;value:string;icon:React.ReactNode;tint:string}) {
+function Stat({label,value,icon,tint}:{label:string;value:string;icon:ReactNode;tint:string}) {
   return <div className="stat-card"><div className={'stat-icon '+tint}>{icon}</div><div className="stat-label">{label}</div><div className="stat-value">{value}</div></div>
 }
 function ProjectCard({project,onOpen,index}:{project:Project;onOpen:(p:Project)=>void;index:number}) {
