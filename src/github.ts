@@ -16,29 +16,33 @@ async function request<T>(url: string, token?: string, init?: RequestInit): Prom
 }
 export async function startDeviceFlow(): Promise<DeviceCode> {
   if (!CLIENT_ID) throw new Error('GitHub OAuth client ID is not configured. Set VITE_GITHUB_CLIENT_ID in your environment.')
-  const url = new URL('https://github.com/login/device/code')
-  url.searchParams.set('client_id', CLIENT_ID)
-  url.searchParams.set('scope', SCOPES)
-  // Keep this a simple cross-origin request (no JSON Content-Type preflight).
-  const response = await fetch(url.toString(), { method:'POST', headers:{Accept:'application/json'} })
-  if (!response.ok) throw new Error('Could not start GitHub sign-in ('+response.status+')')
-  return response.json()
+  const response = await fetch('/.netlify/functions/github-device', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client_id: CLIENT_ID, scope: SCOPES })
+  })
+  const data = await response.json() as DeviceCode & { error?: string; detail?: string }
+  if (!response.ok || data.error) throw new Error(data.detail || data.error || 'Could not start GitHub sign-in')
+  return data
 }
 export async function pollDeviceToken(device: DeviceCode): Promise<string> {
   if (!CLIENT_ID) throw new Error('GitHub OAuth client ID is not configured.')
-  const url = new URL('https://github.com/login/oauth/access_token')
-  url.searchParams.set('client_id', CLIENT_ID)
-  url.searchParams.set('device_code', device.device_code)
-  url.searchParams.set('grant_type', 'urn:ietf:params:oauth:grant-type:device_code')
-  // Avoid JSON Content-Type so the browser does not trigger a CORS preflight.
-  const response = await fetch(url.toString(), { method:'POST', headers:{Accept:'application/json'} })
-  const result = await response.json() as {access_token?:string;error?:string;interval?:number}
+  const response = await fetch('/.netlify/functions/github-token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: CLIENT_ID,
+      device_code: device.device_code,
+      grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
+    })
+  })
+  const result = await response.json() as {access_token?:string;error?:string;interval?:number;detail?:string}
   if (result.access_token) return result.access_token
   if (result.error === 'authorization_pending') throw new Error('authorization_pending')
   if (result.error === 'slow_down') throw new Error('slow_down')
   if (result.error === 'expired_token') throw new Error('expired_token')
   if (result.error === 'access_denied') throw new Error('access_denied')
-  throw new Error(result.error || 'GitHub authorization failed')
+  throw new Error(result.detail || result.error || 'GitHub authorization failed')
 }
 export const getUser = (token:string) => request<GitHubUser>(API+'/user',token)
 export const getRepos = (token:string) => request<GitHubRepo[]>(API+'/user/repos?visibility=public&sort=updated&per_page=100',token)
