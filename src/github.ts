@@ -16,13 +16,22 @@ async function request<T>(url: string, token?: string, init?: RequestInit): Prom
 }
 export async function startDeviceFlow(): Promise<DeviceCode> {
   if (!CLIENT_ID) throw new Error('GitHub OAuth client ID is not configured. Set VITE_GITHUB_CLIENT_ID in your environment.')
-  const response = await fetch('https://github.com/login/device/code', { method:'POST', headers:{Accept:'application/json','Content-Type':'application/json'}, body:JSON.stringify({client_id:CLIENT_ID,scope:SCOPES}) })
+  const url = new URL('https://github.com/login/device/code')
+  url.searchParams.set('client_id', CLIENT_ID)
+  url.searchParams.set('scope', SCOPES)
+  // Keep this a simple cross-origin request (no JSON Content-Type preflight).
+  const response = await fetch(url.toString(), { method:'POST', headers:{Accept:'application/json'} })
   if (!response.ok) throw new Error('Could not start GitHub sign-in ('+response.status+')')
   return response.json()
 }
 export async function pollDeviceToken(device: DeviceCode): Promise<string> {
   if (!CLIENT_ID) throw new Error('GitHub OAuth client ID is not configured.')
-  const response = await fetch('https://github.com/login/oauth/access_token', { method:'POST', headers:{Accept:'application/json','Content-Type':'application/json'}, body:JSON.stringify({client_id:CLIENT_ID,device_code:device.device_code,grant_type:'urn:ietf:params:oauth:grant-type:device_code'}) })
+  const url = new URL('https://github.com/login/oauth/access_token')
+  url.searchParams.set('client_id', CLIENT_ID)
+  url.searchParams.set('device_code', device.device_code)
+  url.searchParams.set('grant_type', 'urn:ietf:params:oauth:grant-type:device_code')
+  // Avoid JSON Content-Type so the browser does not trigger a CORS preflight.
+  const response = await fetch(url.toString(), { method:'POST', headers:{Accept:'application/json'} })
   const result = await response.json() as {access_token?:string;error?:string;interval?:number}
   if (result.access_token) return result.access_token
   if (result.error === 'authorization_pending') throw new Error('authorization_pending')
