@@ -49,11 +49,9 @@ function App() {
   useEffect(() => { saveProjects(projects) }, [projects])
   const visible = projects.filter(p => p.tracked && (p.name.toLowerCase().includes(query.toLowerCase()) || p.description.toLowerCase().includes(query.toLowerCase())))
   const toggleTrack = (id: string) => {
-    setProjects(prev => {
-      const updated = prev.map(p => p.id === id ? { ...p, tracked: !p.tracked } : p)
-      if (githubToken) void persistCloudConfig(githubToken, gistId, updated, setGistId)
-      return updated
-    })
+    const updated = projects.map(p => p.id === id ? { ...p, tracked: !p.tracked } : p)
+    setProjects(updated)
+    if (githubToken) void persistCloudConfig(githubToken, gistId, updated, setGistId)
   }
   const refreshLiveProjects = async (token: string, repoList: GitHubRepo[], current: Project[]) => {
     const tracked = current.filter(p => p.tracked && p.live)
@@ -104,7 +102,23 @@ function App() {
   const openProject = (project: Project) => setSelected(project)
   useEffect(() => {
     if (!githubToken) return
-    getUser(githubToken).then(setGithubUser).catch(()=>{setGithubToken(null);localStorage.removeItem('repopulse.github.token');setNotice('GitHub session expired. Please reconnect.')})
+    let cancelled=false
+    const restore=async()=>{
+      try{
+        const [user,repos,gist]=await Promise.all([getUser(githubToken),getRepos(githubToken),findConfigGist(githubToken)])
+        if(cancelled)return
+        setGithubUser(user);setGithubRepos(repos);setGistId(gist?.id??null)
+        if(gist?.id)localStorage.setItem('repopulse.config.gist',gist.id)
+        let trackedIds:number[]=[]
+        try{const raw=gist?.files?.['repopulse-config.json']?.content;if(raw){const cfg=JSON.parse(raw);trackedIds=Array.isArray(cfg.trackedRepoIds)?cfg.trackedRepoIds:[]}}catch{}
+        const liveProjects:Project[]=repos.map((r,i)=>({id:String(r.id),name:r.name,description:r.description||r.full_name,repo:r.name,branch:r.default_branch,color:['coral','violet','cyan','amber','pink'][i%5],updated:r.updated_at,tracked:trackedIds.includes(r.id),live:true,owner:r.owner.login,repoId:r.id,htmlUrl:r.html_url,plan:'',log:''}))
+        setProjects(liveProjects)
+        await refreshLiveProjects(githubToken,repos,liveProjects)
+        if(!gist)await persistCloudConfig(githubToken,null,liveProjects,setGistId)
+      }catch(e){if(!cancelled){setGithubToken(null);localStorage.removeItem('repopulse.github.token');setNotice(e instanceof Error?e.message:'GitHub session expired. Please reconnect.')}}
+    }
+    void restore()
+    return()=>{cancelled=true}
   }, [])
   useEffect(() => {
     if (!githubToken || !githubUser || !githubRepos.length) return
