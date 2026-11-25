@@ -40,7 +40,7 @@ export async function saveGist(token:string, gistId:string|null, content:string)
  if(gistId) return request<Gist>(API+'/gists/'+gistId,token,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
  return request<Gist>(API+'/gists',token,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
 }
-export async function findConfigGist(token:string):Promise<Gist|null>{ const gists=await listGists(token); return gists.find(g=>g.files?.['repopulse-config.json'] && !g.public) ?? null }
+export async function findConfigGist(token:string):Promise<Gist|null>{ const gists=await listGists(token); const match=gists.find(g=>Object.keys(g.files||{}).includes('repopulse-config.json') && !g.public); if(!match)return null; return request<Gist>(API+'/gists/'+match.id,token) }
 export async function readTextFile(token:string, repo:GitHubRepo, path:string):Promise<string|null>{
  const url=API+'/repos/'+repo.owner.login+'/'+repo.name+'/contents/'+path.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(repo.default_branch)
  try{ const item=await request<{type:string;content?:string;encoding?:string}>(url,token); if(item.type!=='file'||!item.content)return null; return decodeURIComponent(escape(atob(item.content.replace(/\n/g,'')))) }catch{return null}
