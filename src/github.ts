@@ -35,7 +35,6 @@ export const getUser = (token:string) => request<GitHubUser>(API+'/user',token)
 export const getRepos = (token:string) => request<GitHubRepo[]>(API+'/user/repos?visibility=public&sort=updated&per_page=100',token)
 export type Gist = { id:string; description:string; files:Record<string,{content:string}>; public:boolean }
 export const listGists = (token:string) => request<Gist[]>(API+'/gists?per_page=100',token)
-export const createGist = (token:string, content:string) => request<Gist>(API+'/gists',{ } as any).catch(()=>{throw new Error('Internal call error')})
 export async function saveGist(token:string, gistId:string|null, content:string):Promise<Gist>{
  const payload={description:'RepoPulse personal configuration — selected repositories and preferences',public:false,files:{'repopulse-config.json':{content}}}
  if(gistId) return request<Gist>(API+'/gists/'+gistId,token,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
