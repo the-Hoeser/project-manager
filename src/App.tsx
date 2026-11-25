@@ -41,14 +41,14 @@ function App() {
   const visible = projects.filter(p => p.tracked && (p.name.toLowerCase().includes(query.toLowerCase()) || p.description.toLowerCase().includes(query.toLowerCase())))
   const toggleTrack = (id: string) => setProjects(prev => prev.map(p => p.id === id ? { ...p, tracked: !p.tracked } : p))
   const setTask = (projectId: string, phaseIndex: number, taskIndex: number, checked: boolean) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id !== projectId) return p
-      const phases = parseMarkdownPlan(p.plan)
+    const rebuildPlan = (plan: string) => {
+      const phases = parseMarkdownPlan(plan)
+      if (!phases[phaseIndex]?.tasks[taskIndex]) return plan
       phases[phaseIndex].tasks[taskIndex].done = checked
-      const rebuilt = phases.map(ph => '# ' + ph.title + '\n' + ph.tasks.map(t => '- [' + (t.done ? 'x' : ' ') + '] ' + t.title).join('\n')).join('\n')
-      return { ...p, plan: rebuilt }
-    }))
-    setSelected(prev => prev?.id === projectId ? projects.find(p => p.id === projectId) ?? prev : prev)
+      return phases.map(ph => '# ' + ph.title + '\\n' + ph.tasks.map(t => '- [' + (t.done ? 'x' : ' ') + '] ' + t.title).join('\\n')).join('\\n')
+    }
+    setProjects(prev => prev.map(p => p.id === projectId ? { ...p, plan: rebuildPlan(p.plan) } : p))
+    setSelected(prev => prev?.id === projectId ? { ...prev, plan: rebuildPlan(prev.plan) } : prev)
   }
   const openProject = (project: Project) => setSelected(project)
   return <div className="app-shell">
