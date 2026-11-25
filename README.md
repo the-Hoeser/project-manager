@@ -4,7 +4,7 @@ A GitHub-connected project progress tracker. RepoPulse measures completion from 
 
 ## Current status
 
-RepoPulse now includes a working browser-side GitHub integration architecture, persistent local cache, private Gist configuration storage, and a deterministic Markdown checklist progress engine. OAuth setup and a build verification workflow are still pending validation.
+RepoPulse now includes a working browser-side GitHub integration architecture, persistent local cache, private Gist configuration storage, and a deterministic Markdown checklist progress engine. OAuth Client ID is now configured in the frontend; browser sign-in and build verification still need testing.
 
 ### Implemented in this scaffold
 - Cinematic light UI with warm ivory surfaces and Good Time-inspired pink / violet / cyan / amber color energy
@@ -27,7 +27,7 @@ RepoPulse now includes a working browser-side GitHub integration architecture, p
 - Live project checklist is read-only: RepoPulse never writes tasks back into project repositories
 
 ### Remaining
-- Configure OAuth client ID and test actual sign-in in browser
+- Test actual GitHub Device Flow sign-in in browser
 - Add support for private repositories through an explicit permission decision
 - Add tests and deploy
 
@@ -42,13 +42,13 @@ RepoPulse now includes a working browser-side GitHub integration architecture, p
 1. Create a GitHub OAuth App in GitHub Settings → Developer settings → OAuth Apps.
 2. Enable **Device Flow** for the OAuth App.
 3. Copy its Client ID.
-4. Create a local `.env` file from `.env.example` and set `VITE_GITHUB_CLIENT_ID`.
+4. The configured Client ID is included as a public frontend value. You may override it locally with `VITE_GITHUB_CLIENT_ID` in `.env`.
 5. Run `npm install` and `npm run dev`.
 6. In RepoPulse, click **Connect GitHub** and complete the code-based authorization.
 
 This first implementation requests `read:user` and `gist` scopes. It can list and read public repositories and create/update a private Gist for configuration. It deliberately does **not** request the broad `repo` scope, so private repositories are not yet supported. OAuth access tokens are stored in browser local storage for return-session continuity; this is a backend-free trade-off, and users can disconnect to clear the saved token.
 
-Create a production OAuth App with Device Flow enabled and configure its Client ID in the static hosting provider's build environment. Never add a client secret to frontend code.
+The OAuth Client ID is public and configured as a frontend value. Never add a client secret to frontend code.
 
 ## Run locally
 
