@@ -2,7 +2,7 @@ export type GitHubUser = { login: string; avatar_url: string; name?: string | nu
 export type GitHubRepo = { id: number; name: string; full_name: string; description: string | null; default_branch: string; html_url: string; updated_at: string; private: boolean; owner: { login: string } }
 export type DeviceCode = { device_code: string; user_code: string; verification_uri: string; expires_in: number; interval: number }
 const API = 'https://api.github.com'
-const CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID as string | undefined
+const CLIENT_ID = (import.meta.env.VITE_GITHUB_CLIENT_ID as string | undefined) || 'Ov23liq5pfc8zc6T0VZu'
 const SCOPES = 'gist,read:user'
 export const githubClientConfigured = Boolean(CLIENT_ID)
 async function request<T>(url: string, token?: string, init?: RequestInit): Promise<T> {
