@@ -21,8 +21,13 @@ export async function startDeviceFlow(): Promise<DeviceCode> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ client_id: CLIENT_ID, scope: SCOPES })
   })
-  const data = await response.json() as DeviceCode & { error?: string; detail?: string }
-  if (!response.ok || data.error) throw new Error(data.detail || data.error || 'Could not start GitHub sign-in')
+  const raw = await response.text()
+  let data: (DeviceCode & { error?: string; detail?: string }) | null = null
+  try { data = JSON.parse(raw) } catch {}
+  if (!response.ok || !data || data.error) {
+    const detail = data?.detail || data?.error || raw.slice(0, 180).replace(/\\s+/g, ' ')
+    throw new Error('Device endpoint returned HTTP ' + response.status + ': ' + detail)
+  }
   return data
 }
 export async function pollDeviceToken(device: DeviceCode): Promise<string> {
@@ -36,7 +41,10 @@ export async function pollDeviceToken(device: DeviceCode): Promise<string> {
       grant_type: 'urn:ietf:params:oauth:grant-type:device_code'
     })
   })
-  const result = await response.json() as {access_token?:string;error?:string;interval?:number;detail?:string}
+  const raw = await response.text()
+  let result: {access_token?:string;error?:string;interval?:number;detail?:string} = {}
+  try { result = JSON.parse(raw) } catch {}
+  if (!response.ok && !result.error) throw new Error('Token endpoint returned HTTP ' + response.status + ': ' + raw.slice(0, 180).replace(/\\s+/g, ' '))
   if (result.access_token) return result.access_token
   if (result.error === 'authorization_pending') throw new Error('authorization_pending')
   if (result.error === 'slow_down') throw new Error('slow_down')
