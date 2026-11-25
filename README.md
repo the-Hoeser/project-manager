@@ -4,7 +4,7 @@ A GitHub-connected project progress tracker. RepoPulse measures completion from 
 
 ## Current status
 
-This repository currently contains the **front-end prototype** with local sample repositories and a deterministic Markdown checklist progress engine.
+RepoPulse now includes a working browser-side GitHub integration architecture, persistent local cache, private Gist configuration storage, and a deterministic Markdown checklist progress engine. OAuth setup and a build verification workflow are still pending validation.
 
 ### Implemented in this scaffold
 - Cinematic light UI with warm ivory surfaces and Good Time-inspired pink / violet / cyan / amber color energy
