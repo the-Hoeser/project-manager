@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { loadProjects, saveProjects } from './storage'
+import { githubClientConfigured, startDeviceFlow, pollDeviceToken, getUser, getRepos, findConfigGist, saveGist, readRepoPlan, getLatestCommit, type GitHubRepo, type GitHubUser, type DeviceCode } from './github'
 import { Activity, ArrowUpRight, BookOpen, Check, ChevronDown, Circle, Clock3, Github, LayoutDashboard, ListChecks, Plus, Search, Settings2, Sparkles, Target, X } from 'lucide-react'
 import { parseMarkdownPlan, progressFromPhases, parseLogbook } from './progress'
 
 type Project = {
   id: string; name: string; description: string; repo: string; branch: string; color: string;
-  plan: string; log: string; updated: string; tracked: boolean
+  plan: string; log: string; updated: string; tracked: boolean; live?: boolean; owner?: string; repoId?: number; htmlUrl?: string; commitSha?: string
 }
 const initialProjects: Project[] = [
   { id:'hacktony', name:'HackTony', description:'Hackathon build · product prototype', repo:'hacktony', branch:'main', color:'coral', updated:'2 hours ago', tracked:true,
@@ -33,6 +34,12 @@ const totalStats = (projects: Project[]) => {
 }
 function App() {
   const [projects, setProjects] = useState(() => loadProjects(initialProjects))
+  const [githubToken, setGithubToken] = useState<string|null>(() => localStorage.getItem('repopulse.github.token'))
+  const [githubUser, setGithubUser] = useState<GitHubUser|null>(null)
+  const [githubRepos, setGithubRepos] = useState<GitHubRepo[]>([])
+  const [gistId, setGistId] = useState<string|null>(localStorage.getItem('repopulse.config.gist'))
+  const [connectOpen, setConnectOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [query, setQuery] = useState('')
   const [view, setView] = useState<'overview'|'repos'|'activity'>('overview')
   const [selected, setSelected] = useState<Project | null>(null)
@@ -41,7 +48,49 @@ function App() {
   const stats = useMemo(() => totalStats(projects), [projects])
   useEffect(() => { saveProjects(projects) }, [projects])
   const visible = projects.filter(p => p.tracked && (p.name.toLowerCase().includes(query.toLowerCase()) || p.description.toLowerCase().includes(query.toLowerCase())))
-  const toggleTrack = (id: string) => setProjects(prev => prev.map(p => p.id === id ? { ...p, tracked: !p.tracked } : p))
+  const toggleTrack = (id: string) => {
+    setProjects(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, tracked: !p.tracked } : p)
+      if (githubToken) void persistCloudConfig(githubToken, gistId, updated, setGistId)
+      return updated
+    })
+  }
+  const refreshLiveProjects = async (token: string, repoList: GitHubRepo[], current: Project[]) => {
+    const tracked = current.filter(p => p.tracked && p.live)
+    if (!tracked.length) return current
+    setSyncing(true)
+    try {
+      const refreshed = await Promise.all(tracked.map(async p => {
+        const repo = repoList.find(r => r.id === p.repoId)
+        if (!repo) return p
+        const [files, commit] = await Promise.all([readRepoPlan(token, repo), getLatestCommit(token, repo).catch(()=>p.commitSha||'')])
+        return { ...p, plan: files.plan || p.plan, log: files.log || p.log, updated: new Date().toLocaleString(), commitSha: commit }
+      }))
+      const map = new Map(refreshed.map(p=>[p.id,p]))
+      const updated = current.map(p=>map.get(p.id)??p)
+      setProjects(updated)
+      setNotice('GitHub sync complete · progress recalculated from repository Markdown')
+      return updated
+    } catch (err) { setNotice(err instanceof Error ? err.message : 'Sync failed'); return current }
+    finally { setSyncing(false) }
+  }
+  const connectGitHub = async (token: string) => {
+    localStorage.setItem('repopulse.github.token', token)
+    setGithubToken(token)
+    const [user, repos, gist] = await Promise.all([getUser(token), getRepos(token), findConfigGist(token)])
+    setGithubUser(user); setGithubRepos(repos); setGistId(gist?.id ?? null)
+    if (gist?.id) localStorage.setItem('repopulse.config.gist',gist.id); else localStorage.removeItem('repopulse.config.gist')
+    let trackedIds: number[] = []
+    if (gist?.files?.['repopulse-config.json']?.content) {
+      try { const cfg=JSON.parse(gist.files['repopulse-config.json'].content); trackedIds=Array.isArray(cfg.trackedRepoIds)?cfg.trackedRepoIds:[] } catch { trackedIds=[] }
+    }
+    const liveProjects: Project[] = repos.map((r,i)=>({id:String(r.id),name:r.name,description:r.description||r.full_name,repo:r.name,branch:r.default_branch,color:['coral','violet','cyan','amber','pink'][i%5],updated:r.updated_at,tracked:trackedIds.includes(r.id),live:true,owner:r.owner.login,repoId:r.id,htmlUrl:r.html_url,plan:'',log:''}))
+    setProjects(liveProjects)
+    const updated=await refreshLiveProjects(token,repos,liveProjects)
+    if (!gist) await persistCloudConfig(token,null,updated,setGistId)
+    setNotice('Connected to GitHub · '+repos.length+' public repositories available')
+  }
+  const disconnectGitHub = () => { localStorage.removeItem('repopulse.github.token'); localStorage.removeItem('repopulse.config.gist'); setGithubToken(null); setGithubUser(null); setGithubRepos([]); setGistId(null); setProjects(initialProjects); setNotice('Disconnected · demo projects restored') }
   const setTask = (projectId: string, phaseIndex: number, taskIndex: number, checked: boolean) => {
     const rebuildPlan = (plan: string) => {
       const phases = parseMarkdownPlan(plan)
@@ -53,6 +102,17 @@ function App() {
     setSelected(prev => prev?.id === projectId ? { ...prev, plan: rebuildPlan(prev.plan) } : prev)
   }
   const openProject = (project: Project) => setSelected(project)
+  useEffect(() => {
+    if (!githubToken) return
+    getUser(githubToken).then(setGithubUser).catch(()=>{setGithubToken(null);localStorage.removeItem('repopulse.github.token');setNotice('GitHub session expired. Please reconnect.')})
+  }, [])
+  useEffect(() => {
+    if (!githubToken || !githubUser || !githubRepos.length) return
+    const refresh = () => { if (document.visibilityState === 'visible') void refreshLiveProjects(githubToken,githubRepos,projects) }
+    const interval = window.setInterval(refresh, 30*60*1000)
+    document.addEventListener('visibilitychange',refresh)
+    return () => { window.clearInterval(interval); document.removeEventListener('visibilitychange',refresh) }
+  }, [githubToken,githubUser,githubRepos,projects])
   return <div className="app-shell">
     <div className="ambient ambient-one" /><div className="ambient ambient-two" />
     <aside className="sidebar">
@@ -73,14 +133,22 @@ function App() {
     <main className="main-content">
       <header className="topbar">
         <div className="breadcrumb"><span>Workspace</span><span className="crumb-sep">/</span><strong>{selected ? selected.name : view==='overview'?'Overview':view==='repos'?'Repositories':'Activity'}</strong></div>
-        <div className="top-actions"><div className="search-box"><Search size={16}/><input placeholder="Search projects..." value={query} onChange={e=>setQuery(e.target.value)}/><kbd>⌘ K</kbd></div><button className="avatar">RP</button></div>
+        <div className="top-actions"><button className="github-connect-btn" onClick={()=>githubToken?disconnectGitHub():setConnectOpen(true)}>{githubToken?<><Github size={15}/> {githubUser?.login||'GitHub'} · Disconnect</>:<><Github size={15}/> Connect GitHub</>}</button><div className="search-box"><Search size={16}/><input placeholder="Search projects..." value={query} onChange={e=>setQuery(e.target.value)}/><kbd>⌘ K</kbd></div><button className="avatar">RP</button></div>
       </header>
       {selected ? <ProjectDetail project={selected} onClose={()=>setSelected(null)} onTask={setTask}/> : view==='overview' ? <Overview projects={visible} stats={stats} onOpen={openProject} onAdd={()=>setShowPicker(true)} query={query}/> : view==='repos' ? <RepoView projects={projects} onToggle={toggleTrack} onOpen={openProject} query={query}/> : <ActivityView projects={projects.filter(p=>p.tracked)}/>}
-      <div className="notice"><Sparkles size={14}/>{notice}</div>
+      <div className="notice"><Sparkles size={14}/>{syncing?'Syncing selected repositories…':notice}</div>
     </main>
-    {showPicker && <RepoPicker projects={projects} onToggle={toggleTrack} onClose={()=>setShowPicker(false)}/>}
+    {showPicker && <RepoPicker projects={projects} onToggle={toggleTrack} onClose={()=>setShowPicker(false)}/>}{connectOpen && <ConnectGitHub onClose={()=>setConnectOpen(false)} onConnected={async token=>{setConnectOpen(false);try{await connectGitHub(token)}catch(e){setNotice(e instanceof Error?e.message:'GitHub connection failed')}}}/}
   </div>
 }
+
+function ConnectGitHub({onClose,onConnected}:{onClose:()=>void;onConnected:(token:string)=>void}) {
+ const [device,setDevice]=useState<DeviceCode|null>(null); const [busy,setBusy]=useState(false); const [error,setError]=useState(''); const [status,setStatus]=useState('')
+ const begin=async()=>{setError('');setBusy(true);try{const d=await startDeviceFlow();setDevice(d);setStatus('Waiting for authorization…');window.open(d.verification_uri,'_blank','noopener,noreferrer');let wait=d.interval||5;const end=Date.now()+d.expires_in*1000;while(Date.now()<end){await new Promise(r=>setTimeout(r,wait*1000));try{const token=await pollDeviceToken(d);onConnected(token);return}catch(e){const message=e instanceof Error?e.message:'';if(message==='authorization_pending')continue;if(message==='slow_down'){wait+=5;continue}if(message==='expired_token')throw new Error('Code expired. Start again.');if(message==='access_denied')throw new Error('Authorization denied.');throw e}}throw new Error('Authorization expired. Start again.')}catch(e){setError(e instanceof Error?e.message:'Authorization failed')}finally{setBusy(false)}}
+ return <div className="modal-backdrop" onClick={onClose}><div className="connect-modal" onClick={e=>e.stopPropagation()}><div className="picker-head"><div><div className="eyebrow">GITHUB AUTHORIZATION</div><h2>Bring your projects to life.</h2></div><button className="icon-btn" onClick={onClose}><X size={18}/></button></div><p className="connect-copy">RepoPulse uses GitHub to read your public repositories and store a small private configuration Gist. It does not write to your repositories.</p>{!githubClientConfigured&&<div className="error-panel">GitHub OAuth Client ID is not configured yet. Set <code>VITE_GITHUB_CLIENT_ID</code> after creating a GitHub OAuth App with Device Flow enabled.</div>}{device&&<div className="device-code"><span>Enter this code on GitHub</span><strong>{device.user_code}</strong><button className="text-btn" onClick={()=>navigator.clipboard.writeText(device.user_code)}>Copy code</button><small>{status}</small></div>}{error&&<div className="error-panel">{error}</div>}<div className="connect-actions"><button className="primary-btn" disabled={!githubClientConfigured||busy} onClick={begin}>{busy?'Waiting for GitHub…':'Authorize with GitHub'}</button><button className="text-btn" onClick={onClose}>Cancel</button></div><div className="connect-foot">Permissions requested: read your profile, access public repositories, and create/update a private Gist. Private repository access is not included in this first release.</div></div></div>
+}
+async function persistCloudConfig(token:string,gistId:string|null,projects:Project[],setGistId:(id:string)=>void){const trackedRepoIds=projects.filter(p=>p.tracked&&p.live&&p.repoId).map(p=>p.repoId);const content=JSON.stringify({version:1,app:'RepoPulse',trackedRepoIds,trackedRepositories:projects.filter(p=>p.tracked&&p.live).map(p=>({id:p.repoId,owner:p.owner,repo:p.repo,branch:p.branch,htmlUrl:p.htmlUrl})),updatedAt:new Date().toISOString()},null,2);try{const saved=await saveGist(token,gistId,content);setGistId(saved.id);localStorage.setItem('repopulse.config.gist',saved.id)}catch(e){console.error('RepoPulse cloud config save failed',e)}}
+
 function Progress({percent,color='coral',large=false}:{percent:number;color?:string;large?:boolean}) {
   return <div className={large?'progress-track large':'progress-track'}><div className={'progress-fill '+color} style={{width:percent+'%'}}/></div>
 }
@@ -116,8 +184,8 @@ function ProjectDetail({project,onClose,onTask}:{project:Project;onClose:()=>voi
     <div className="detail-hero"><div className={'detail-orb '+project.color}><div className="orb-inner"/></div><div className="detail-title"><div className="eyebrow">PROJECT DETAIL</div><h1>{project.name}</h1><p>{project.description}</p><div className="detail-links"><span><Github size={14}/>{project.repo}</span><span>·</span><span>{project.branch}</span><span>·</span><span>Updated {project.updated}</span></div></div></div>
     <div className="detail-progress"><div><div className="eyebrow">PROJECT COMPLETION</div><div className="big-percent">{progress.percent}<span>%</span></div><div className="progress-caption">{progress.done} of {progress.total} checklist items completed</div></div><div className="detail-progress-bar"><Progress percent={progress.percent} color={project.color} large/></div></div>
     <div className="detail-columns"><div className="phase-column"><div className="section-heading"><div><h2>Plan & milestones</h2><p>Check off tasks as they ship.</p></div><span className="phase-count">{phases.length} phases</span></div>
-      {phases.map((phase,pi)=><div className="phase-card" key={phase.title}><div className="phase-header"><h3>{phase.title}</h3><span>{phase.tasks.filter(t=>t.done).length}/{phase.tasks.length}</span></div><div className="phase-progress"><Progress percent={Math.round(phase.tasks.filter(t=>t.done).length/phase.tasks.length*100)} color={project.color}/></div>{phase.tasks.map((task,ti)=><label className="task-row" key={task.title}><input type="checkbox" checked={task.done} onChange={e=>onTask(project.id,pi,ti,e.target.checked)}/><span className="task-check"><Check size={12}/></span><span className={task.done?'task-title done':'task-title'}>{task.title}</span></label>)}</div>)}
-    </div><div className="activity-column"><div className="section-heading"><div><h2>Recent notes</h2><p>From your project logbook.</p></div></div><div className="log-card"><div className="log-title"><BookOpen size={16}/> Development log</div>{log.length?log.map((entry,i)=><div className="log-entry" key={i}><span className="log-dot"/><p>{entry}</p></div>):<p className="muted">No log entries found.</p>}<div className="log-foot">Sample log · replace when GitHub sync is connected</div></div><div className="source-card"><div className="source-icon"><ListChecks size={18}/></div><div><strong>Progress source</strong><p>Markdown checklists · deterministic calculation</p></div></div></div></div>
+      {phases.map((phase,pi)=><div className="phase-card" key={phase.title}><div className="phase-header"><h3>{phase.title}</h3><span>{phase.tasks.filter(t=>t.done).length}/{phase.tasks.length}</span></div><div className="phase-progress"><Progress percent={Math.round(phase.tasks.filter(t=>t.done).length/phase.tasks.length*100)} color={project.color}/></div>{phase.tasks.map((task,ti)=><label className="task-row" key={task.title}><input type="checkbox" checked={task.done} disabled={project.live} onChange={e=>onTask(project.id,pi,ti,e.target.checked)}/><span className="task-check"><Check size={12}/></span><span className={task.done?'task-title done':'task-title'}>{task.title}</span></label>)}</div>)}
+    </div><div className="activity-column"><div className="section-heading"><div><h2>Recent notes</h2><p>From your project logbook.</p></div></div><div className="log-card"><div className="log-title"><BookOpen size={16}/> Development log</div>{log.length?log.map((entry,i)=><div className="log-entry" key={i}><span className="log-dot"/><p>{entry}</p></div>):<p className="muted">No log entries found.</p>}<div className="log-foot">{project.live?'Live repository Markdown · refreshed automatically':'Sample log · GitHub sync not connected'}</div></div><div className="source-card"><div className="source-icon"><ListChecks size={18}/></div><div><strong>Progress source</strong><p>Markdown checklists · deterministic calculation</p></div></div></div></div>
   </div>
 }
 function RepoView({projects,onToggle,onOpen,query}:{projects:Project[];onToggle:(id:string)=>void;onOpen:(p:Project)=>void;query:string}) {
