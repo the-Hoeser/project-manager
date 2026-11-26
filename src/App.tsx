@@ -76,6 +76,34 @@ function App() {
     } catch (err) { setNotice(err instanceof Error ? err.message : 'Sync failed'); return current }
     finally { setSyncing(false) }
   }
+  const openHackTonyRequestedRepo = async (token:string, repoList:GitHubRepo[], current:Project[], currentGistId:string|null):Promise<{projects:Project[];opened:boolean}> => {
+    const params=new URLSearchParams(window.location.search)
+    const requestedRepo=params.get('repo')
+    if(!requestedRepo)return {projects:current,opened:false}
+    const match=repoList.find(repo=>repo.full_name.toLowerCase()===requestedRepo.toLowerCase())
+    if(!match){
+      setNotice('HackTony linked '+requestedRepo+', but it is not available in this connected public GitHub account. Check the owner/repository name and public access.')
+      return {projects:current,opened:false}
+    }
+    const tracked=current.map(project=>project.repoId===match.id?{...project,tracked:true}:project)
+    setProjects(tracked)
+    const refreshed=await refreshLiveProjects(token,repoList,tracked)
+    const project=refreshed.find(item=>item.repoId===match.id)||tracked.find(item=>item.repoId===match.id)
+    if(!project)return {projects:refreshed,opened:false}
+    const selectedProject={...project,tracked:true}
+    const persisted=refreshed.map(item=>item.repoId===match.id?selectedProject:item)
+    setProjects(persisted)
+    setSelected(selectedProject)
+    setView('overview')
+    if(currentGistId)await persistCloudConfig(token,currentGistId,persisted,setGistId)
+    const hackathon=params.get('hackathon')
+    setNotice('Opened from HackTony'+(hackathon?' · '+hackathon:'')+' · progress is calculated from the repository plan.')
+    ;['repo','source','hackathon','hackathonId'].forEach(key=>params.delete(key))
+    const remaining=params.toString()
+    window.history.replaceState({},'',window.location.pathname+(remaining?'?'+remaining:'')+window.location.hash)
+    return {projects:persisted,opened:true}
+  }
+
   const connectGitHub = async (token: string) => {
     localStorage.setItem('repopulse.github.token', token)
     setGithubToken(token)
@@ -89,8 +117,9 @@ function App() {
     const liveProjects: Project[] = repos.map((r,i)=>({id:String(r.id),name:r.name,description:r.description||r.full_name,repo:r.name,branch:r.default_branch,color:['coral','violet','cyan','amber','pink'][i%5],updated:r.updated_at,tracked:trackedIds.includes(r.id),live:true,owner:r.owner.login,repoId:r.id,htmlUrl:r.html_url,plan:'',log:''}))
     setProjects(liveProjects)
     const updated=await refreshLiveProjects(token,repos,liveProjects)
-    if (!gist) await persistCloudConfig(token,null,updated,setGistId)
-    setNotice('Connected to GitHub · '+repos.length+' public repositories available')
+    const linkResult=await openHackTonyRequestedRepo(token,repos,updated,gist?.id??null)
+    if (!gist) await persistCloudConfig(token,null,linkResult.projects,setGistId)
+    if(!linkResult.opened&&!new URLSearchParams(window.location.search).has('repo'))setNotice('Connected to GitHub · '+repos.length+' public repositories available')
   }
   const disconnectGitHub = () => { localStorage.removeItem('repopulse.github.token'); localStorage.removeItem('repopulse.config.gist'); setGithubToken(null); setGithubUser(null); setGithubRepos([]); setGistId(null); setProjects(initialProjects); setNotice('Disconnected · demo projects restored') }
   const setTask = (projectId: string, phaseIndex: number, taskIndex: number, checked: boolean) => {
@@ -115,10 +144,18 @@ function App() {
         if(gist?.id)localStorage.setItem('repopulse.config.gist',gist.id)
         let trackedIds:number[]=[]
         try{const raw=gist?.files?.['repopulse-config.json']?.content;if(raw){const cfg=JSON.parse(raw);trackedIds=Array.isArray(cfg.trackedRepoIds)?cfg.trackedRepoIds:[]}}catch{}
-        const liveProjects:Project[]=repos.map((r,i)=>({id:String(r.id),name:r.name,description:r.description||r.full_name,repo:r.name,branch:r.default_branch,color:['coral','violet','cyan','amber','pink'][i%5],updated:r.updated_at,tracked:trackedIds.includes(r.id),live:true,owner:r.owner.login,repoId:r.id,htmlUrl:r.html_url,plan:'',log:''}))
+        const requestedRepo=new URLSearchParams(window.location.search).get('repo')
+        const liveProjects:Project[]=repos.map((r,i)=>({
+          id:String(r.id),name:r.name,description:r.description||r.full_name,repo:r.name,
+          branch:r.default_branch,color:['coral','violet','cyan','amber','pink'][i%5],
+          updated:r.updated_at,tracked:trackedIds.includes(r.id)||Boolean(requestedRepo&&r.full_name.toLowerCase()===requestedRepo.toLowerCase()),
+          live:true,owner:r.owner.login,repoId:r.id,htmlUrl:r.html_url,plan:'',log:''
+        }))
         setProjects(liveProjects)
-        await refreshLiveProjects(githubToken,repos,liveProjects)
-        if(!gist)await persistCloudConfig(githubToken,null,liveProjects,setGistId)
+        const refreshed=await refreshLiveProjects(githubToken,repos,liveProjects)
+        if(cancelled)return
+        const linkResult=await openHackTonyRequestedRepo(githubToken,repos,refreshed,gist?.id??null)
+        if(!gist)await persistCloudConfig(githubToken,null,linkResult.projects,setGistId)
       }catch(e){if(!cancelled){setGithubToken(null);localStorage.removeItem('repopulse.github.token');setNotice(e instanceof Error?e.message:'GitHub session expired. Please reconnect.')}}
     }
     void restore()
