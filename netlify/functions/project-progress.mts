@@ -2,6 +2,7 @@ import { parseMarkdownPlan, progressFromPhases, parseLogbook } from "../../src/p
 
 const ALLOWED_ORIGINS = new Set([
   "https://hacktony.netlify.app",
+  "https://vilica.netlify.app",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ]);
@@ -25,7 +26,7 @@ async function githubJson<T>(url: string): Promise<T> {
     headers: {
       "Accept": "application/vnd.github+json",
       "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "RepoPulse-ReadOnly-Progress/1.0",
+      "User-Agent": "Vilica-ReadOnly-Progress/1.0",
     },
   });
   if (!response.ok) {
@@ -140,7 +141,7 @@ export default async (request: Request) => {
       latestCommitSha,
       repositoryPushedAt: metadata.pushed_at,
       generatedAt: new Date().toISOString(),
-      source: "RepoPulse Markdown checklist engine",
+      source: "Vilica Markdown checklist engine",
       readOnly: true,
       treeTruncated: Boolean(tree.truncated),
     }, 200, origin);
