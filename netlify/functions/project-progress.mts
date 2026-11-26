@@ -68,7 +68,17 @@ export default async (request: Request) => {
   if (origin && !ALLOWED_ORIGINS.has(origin)) {
     return json({ error: "This read-only progress endpoint is not available to this origin." }, 403);
   }
-  if (request.method === "OPTIONS") return json({}, 204, origin);
+  if (request.method === "OPTIONS") {
+    const headers = new Headers();
+    if (origin && ALLOWED_ORIGINS.has(origin)) {
+      headers.set("access-control-allow-origin", origin);
+      headers.set("access-control-allow-methods", "GET, OPTIONS");
+      headers.set("access-control-allow-headers", "Accept");
+      headers.set("access-control-max-age", "600");
+      headers.set("vary", "Origin");
+    }
+    return new Response(null, { status: 204, headers });
+  }
   if (request.method !== "GET") return json({ error: "GET required. This endpoint is read-only." }, 405, origin);
 
   try {
