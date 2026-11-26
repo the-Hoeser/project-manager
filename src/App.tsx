@@ -65,7 +65,8 @@ function App() {
       const refreshed = await Promise.all(tracked.map(async p => {
         const repo = repoList.find(r => r.id === p.repoId)
         if (!repo) return p
-        const [files, commit] = await Promise.all([readRepoPlan(token, repo), getLatestCommit(token, repo).catch(()=>p.commitSha||'')])
+        const projectRepo = p.branch && p.branch !== repo.default_branch ? { ...repo, default_branch: p.branch } : repo
+        const [files, commit] = await Promise.all([readRepoPlan(token, projectRepo), getLatestCommit(token, projectRepo).catch(()=>p.commitSha||'')])
         return { ...p, plan: files.plan || p.plan, log: files.log || p.log, updated: new Date().toLocaleString(), commitSha: commit }
       }))
       const map = new Map(refreshed.map(p=>[p.id,p]))
@@ -81,11 +82,12 @@ function App() {
     const requestedRepo=params.get('repo')
     if(!requestedRepo)return {projects:current,opened:false}
     const match=repoList.find(repo=>repo.full_name.toLowerCase()===requestedRepo.toLowerCase())
+    const requestedBranch=params.get('branch')||''
     if(!match){
       setNotice('HackTony linked '+requestedRepo+', but it is not available in this connected public GitHub account. Check the owner/repository name and public access.')
       return {projects:current,opened:false}
     }
-    const tracked=current.map(project=>project.repoId===match.id?{...project,tracked:true}:project)
+    const tracked=current.map(project=>project.repoId===match.id?{...project,tracked:true,branch:requestedBranch||project.branch}:project)
     setProjects(tracked)
     const refreshed=await refreshLiveProjects(token,repoList,tracked)
     const project=refreshed.find(item=>item.repoId===match.id)||tracked.find(item=>item.repoId===match.id)
@@ -98,7 +100,7 @@ function App() {
     if(currentGistId)await persistCloudConfig(token,currentGistId,persisted,setGistId)
     const hackathon=params.get('hackathon')
     setNotice('Opened from HackTony'+(hackathon?' · '+hackathon:'')+' · progress is calculated from the repository plan.')
-    ;['repo','source','hackathon','hackathonId'].forEach(key=>params.delete(key))
+    ;['repo','source','hackathon','hackathonId','branch'].forEach(key=>params.delete(key))
     const remaining=params.toString()
     window.history.replaceState({},'',window.location.pathname+(remaining?'?'+remaining:'')+window.location.hash)
     return {projects:persisted,opened:true}
