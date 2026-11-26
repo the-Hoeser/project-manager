@@ -26,6 +26,11 @@ RepoPulse now includes a working browser-side GitHub integration architecture, p
 - Local cache restores instantly; sync runs on return, tab visibility, and every 30 minutes while open
 - Live project checklist is read-only: RepoPulse never writes tasks back into project repositories
 
+### HackTony integration
+- Accepts HackTony deep links with repository, branch, hackathon name, and event ID query parameters
+- Tracks the linked public repository and opens its project detail after GitHub authorization
+- Keeps GitHub authorization and RepoPulse storage independent from HackTony
+
 ### Remaining
 - Test actual GitHub Device Flow sign-in in browser
 - Add support for private repositories through an explicit permission decision
