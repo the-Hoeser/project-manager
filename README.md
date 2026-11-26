@@ -26,6 +26,12 @@ RepoPulse now includes a working browser-side GitHub integration architecture, p
 - Local cache restores instantly; sync runs on return, tab visibility, and every 30 minutes while open
 - Live project checklist is read-only: RepoPulse never writes tasks back into project repositories
 
+### Read-only progress endpoint
+- Netlify Function `/.netlify/functions/project-progress?repo=owner/name&branch=optional` reports checklist progress for a public GitHub repository
+- Uses the same `parseMarkdownPlan` and `progressFromPhases` functions as the RepoPulse UI
+- Allows read-only CORS requests from `https://hacktony.netlify.app` and local development origins
+- Does not require or accept GitHub tokens; it uses unauthenticated public GitHub API reads and is subject to GitHub rate limits
+
 ### HackTony integration
 - Accepts HackTony deep links with repository, branch, hackathon name, and event ID query parameters
 - Tracks the linked public repository and opens its project detail after GitHub authorization
