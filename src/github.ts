@@ -75,4 +75,4 @@ export async function readRepoPlan(token:string,repo:GitHubRepo):Promise<{plan:s
  const plan=planPath?await readTextFile(token,repo,planPath):null; const log=logPath?await readTextFile(token,repo,logPath):null
  return {plan:plan??'',log:log??'',planPath:planPath??'',logPath}
 }
-export async function getLatestCommit(token:string,repo:GitHubRepo):Promise<string>{const c=await request<{sha:string}[]>(API+'/repos/'+repo.owner.login+'/'+repo.name+'/commits?per_page=1',token);return c[0]?.sha??''}
+export async function getLatestCommit(token:string,repo:GitHubRepo):Promise<string>{const c=await request<{sha:string}[]>(API+'/repos/'+repo.owner.login+'/'+repo.name+'/commits?per_page=1&sha='+encodeURIComponent(repo.default_branch),token);return c[0]?.sha??''}
