@@ -1,10 +1,12 @@
-# RepoPulse
+# Vilica
 
-A GitHub-connected project progress tracker. RepoPulse measures completion from repository Markdown plans and checklists—not AI guesses.
+A GitHub-connected project progress tracker. Vilica measures completion from repository Markdown plans and checklists—not AI guesses.
+
+**Production URL:** [https://vilica.netlify.app](https://vilica.netlify.app)
 
 ## Current status
 
-RepoPulse now includes a working browser-side GitHub integration architecture, persistent local cache, private Gist configuration storage, and a deterministic Markdown checklist progress engine. OAuth Client ID is now configured in the frontend; browser sign-in and build verification still need testing.
+Vilica now includes a working browser-side GitHub integration architecture, persistent local cache, private Gist configuration storage, and a deterministic Markdown checklist progress engine. OAuth Client ID is now configured in the frontend; browser sign-in and build verification still need testing.
 
 ### Implemented in this scaffold
 - Cinematic light UI with warm ivory surfaces and Good Time-inspired pink / violet / cyan / amber color energy
@@ -24,28 +26,28 @@ RepoPulse now includes a working browser-side GitHub integration architecture, p
 - Recalculates progress locally from repository Markdown
 - Private Gist configuration stores selected repository IDs
 - Local cache restores instantly; sync runs on return, tab visibility, and every 30 minutes while open
-- Live project checklist is read-only: RepoPulse never writes tasks back into project repositories
+- Live project checklist is read-only: Vilica never writes tasks back into project repositories
 
 ### Read-only progress endpoint
 - Netlify Function `/.netlify/functions/project-progress?repo=owner/name&branch=optional` reports checklist progress for a public GitHub repository
-- Uses the same `parseMarkdownPlan` and `progressFromPhases` functions as the RepoPulse UI
-- Allows read-only CORS requests from `https://hacktony.netlify.app` and local development origins
+- Uses the same `parseMarkdownPlan` and `progressFromPhases` functions as the Vilica UI
+- Allows read-only CORS requests from `https://hacktony.netlify.app`, `https://vilica.netlify.app`, and local development origins
 - Does not require or accept GitHub tokens; it uses unauthenticated public GitHub API reads and is subject to GitHub rate limits
 
 ### HackTony integration
 - Accepts HackTony deep links with repository, branch, hackathon name, and event ID query parameters
 - Tracks the linked public repository and opens its project detail after GitHub authorization
-- Keeps GitHub authorization and RepoPulse storage independent from HackTony
+- Keeps GitHub authorization and Vilica storage independent from HackTony
 
 ### Remaining
 - Test actual GitHub Device Flow sign-in in browser
 - Add support for private repositories through an explicit permission decision
-- Add tests and deploy
+- Add tests for the parser, progress endpoint, and GitHub deep-link flow
 
 ### Persistence model
 - Browser `localStorage` caches dashboard state for fast reopening.
 - A private GitHub Gist named `repopulse-config.json` persists tracked repository IDs across devices.
-- Repository plan/logbook files stay in the original GitHub repositories; RepoPulse does not store project copies on a server.
+- Repository plan/logbook files stay in the original GitHub repositories; Vilica does not store project copies on a server.
 - Sync is browser-side and recalculates progress deterministically.
 
 ## GitHub OAuth setup (backend-free)
@@ -55,13 +57,15 @@ RepoPulse now includes a working browser-side GitHub integration architecture, p
 3. Copy its Client ID.
 4. The configured Client ID is included as a public frontend value. You may override it locally with `VITE_GITHUB_CLIENT_ID` in `.env`.
 5. Run `npm install` and `npm run dev`.
-6. In RepoPulse, click **Connect GitHub** and complete the code-based authorization.
+6. In Vilica, click **Connect GitHub** and complete the code-based authorization.
 
 This first implementation requests `read:user` and `gist` scopes. It can list and read public repositories and create/update a private Gist for configuration. It deliberately does **not** request the broad `repo` scope, so private repositories are not yet supported. OAuth access tokens are stored in browser local storage for return-session continuity; this is a backend-free trade-off, and users can disconnect to clear the saved token.
 
 The OAuth Client ID is public and configured as a frontend value. Never add a client secret to frontend code.
 
 ## Deploy to Netlify
+
+**Live site:** [https://vilica.netlify.app](https://vilica.netlify.app) · [Netlify dashboard](https://app.netlify.com/projects/vilica)
 
 This repository is ready for Netlify continuous deployment. One-click setup: [Deploy to Netlify](https://app.netlify.com/start/deploy?repository=https://github.com/the-Hoeser/project-manager). Connect your GitHub account, choose the repository, and Netlify will use `netlify.toml` to build and publish `dist`. Future pushes to `main` will trigger production deploys.
 
@@ -90,7 +94,7 @@ Percentage is `completed tasks / all tasks * 100`, rounded to the nearest intege
 
 ## GitHub integration plan
 
-Use least-privilege authorization: read repository metadata and contents only. RepoPulse does not need write access to code or repository settings.
+Use least-privilege authorization: read repository metadata and contents only. Vilica does not need write access to code or repository settings.
 
 Recommended phases:
 1. GitHub authorization and repository listing
