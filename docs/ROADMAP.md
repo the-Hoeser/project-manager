@@ -1,4 +1,4 @@
-# RepoPulse Roadmap
+# Vilica Roadmap
 
 ## 1. Prototype
 - [x] React + Vite scaffold
